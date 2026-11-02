@@ -6,9 +6,10 @@ import nl.knaw.huc.core.SupportedType;
 import org.apache.commons.io.IOUtils;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
-import org.apache.tika.parser.AbstractParser;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.Parser;
+import org.apache.tika.parser.ocr.TesseractOCRConfig;
 import org.apache.tika.sax.BodyContentHandler;
 import org.xml.sax.SAXException;
 
@@ -58,13 +59,18 @@ public class FieldsService {
     return new Fields(text);
   }
 
-  private Fields parseWithTika(InputStream inputStream, AbstractParser parser) {
+  private Fields parseWithTika(InputStream inputStream, Parser parser) {
     var bytes = getBytes(inputStream);
     if (bytes.length == 0) {
       return new Fields("");
     }
     var metadata = new Metadata();
     var parseContext = new ParseContext();
+    // tika 3.x runs OCR on embedded images by default; skip it to avoid
+    // OCR-ing thumbnails/figures into the index (and to avoid the tesseract dependency).
+    var ocrConfig = new TesseractOCRConfig();
+    ocrConfig.setSkipOcr(true);
+    parseContext.set(TesseractOCRConfig.class, ocrConfig);
     var handler = new BodyContentHandler(-1);
     try {
       parser.parse(new ByteArrayInputStream(bytes), handler, metadata, parseContext);
